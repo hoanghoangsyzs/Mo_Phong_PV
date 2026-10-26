@@ -542,6 +542,7 @@ export default function App() {
     fetchMe()
       .then((currentUser) => {
         setUser(currentUser);
+        setName(currentUser.name);
         setAuthChecked(true);
       })
       .catch(() => setAuthChecked(true));
@@ -562,6 +563,7 @@ export default function App() {
     setReport(null);
     setActivePage("Mock Interview");
     setUser(nextUser);
+    setName(nextUser.name);
     refreshDashboard();
   };
 

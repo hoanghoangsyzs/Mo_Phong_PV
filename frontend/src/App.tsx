@@ -403,11 +403,15 @@ function AuthPage({ onAuthenticated }: { onAuthenticated: (user: User) => void }
 
   const submit = async () => {
     setError(null);
+    if (mode === "register" && !name.trim()) {
+      setError("Vui lòng nhập họ tên.");
+      return;
+    }
     setLoading(true);
     try {
       const result = mode === "login"
         ? await loginApi({ email, password })
-        : await registerApi({ name, email, password });
+        : await registerApi({ name: name.trim(), email: email.trim(), password });
       onAuthenticated(result.user);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không thể xác thực");

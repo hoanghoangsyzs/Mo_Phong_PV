@@ -32,10 +32,86 @@ function authHeaders(extra?: HeadersInit): HeadersInit {
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
     if (res.status === 401) setToken(null);
-    const err = await res.text();
-    throw new Error(err || res.statusText);
+    const body = await res.text();
+    throw new Error(formatApiError(body, res.status));
   }
   return res.json() as Promise<T>;
+}
+
+const fieldLabels: Record<string, string> = {
+  name: "Họ tên",
+  candidate_name: "Họ tên ứng viên",
+  email: "Email",
+  password: "Mật khẩu",
+  transcript: "Câu trả lời",
+  question_index: "Câu hỏi",
+  position: "Vị trí luyện tập",
+  level: "Trình độ",
+  credential: "Thông tin đăng nhập Google",
+};
+
+function validationMessage(item: { type?: string; loc?: unknown[]; msg?: string; ctx?: Record<string, unknown> }): string {
+  const field = [...(item.loc ?? [])].reverse().find((part) => typeof part === "string");
+  const label = (typeof field === "string" && fieldLabels[field]) || "Thông tin";
+  const minimum = item.ctx?.min_length;
+  const maximum = item.ctx?.max_length;
+
+  switch (item.type) {
+    case "missing":
+      return `Vui lòng nhập ${label.toLowerCase()}.`;
+    case "string_too_short":
+      if (label === "Họ tên" || label === "Họ tên ứng viên" || label === "Câu trả lời") return `Vui lòng nhập ${label.toLowerCase()}.`;
+      return typeof minimum === "number" ? `${label} cần có ít nhất ${minimum} ký tự.` : `${label} chưa hợp lệ.`;
+    case "string_too_long":
+      return typeof maximum === "number" ? `${label} không được vượt quá ${maximum} ký tự.` : `${label} quá dài.`;
+    case "email":
+    case "value_error":
+      return label === "Email" ? "Vui lòng nhập địa chỉ email hợp lệ." : `${label} chưa hợp lệ.`;
+    case "int_parsing":
+    case "float_parsing":
+    case "literal_error":
+      return `${label} không hợp lệ.`;
+    default:
+      return `${label} chưa hợp lệ.`;
+  }
+}
+
+function formatApiError(body: string, status: number): string {
+  let detail: unknown;
+  try {
+    const parsed = JSON.parse(body) as { detail?: unknown };
+    detail = parsed?.detail;
+  } catch {
+    detail = undefined;
+  }
+
+  if (Array.isArray(detail)) {
+    return detail.map((item) => validationMessage(item as Parameters<typeof validationMessage>[0])).join(" ");
+  }
+
+  if (typeof detail === "string") {
+    const known: Record<string, string> = {
+      "Email already registered": "Email này đã được đăng ký.",
+      "Invalid email or password": "Email hoặc mật khẩu không đúng.",
+      "User is inactive": "Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.",
+      "Session not found": "Không tìm thấy buổi phỏng vấn.",
+      "Not allowed": "Bạn không có quyền thực hiện thao tác này.",
+      "Question not found": "Không tìm thấy câu hỏi.",
+      "Session already completed": "Buổi phỏng vấn đã hoàn tất.",
+      "Invalid question index": "Câu hỏi không hợp lệ.",
+      "Report not ready": "Báo cáo chưa sẵn sàng.",
+      "Missing token": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+      "Invalid token": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+      "Invalid export format": "Định dạng xuất báo cáo không hợp lệ.",
+    };
+    if (known[detail]) return known[detail];
+  }
+
+  if (status === 401) return "Email hoặc mật khẩu không đúng, hoặc phiên đăng nhập đã hết hạn.";
+  if (status === 403) return "Bạn không có quyền thực hiện thao tác này.";
+  if (status === 404) return "Không tìm thấy dữ liệu được yêu cầu.";
+  if (status >= 500) return "Máy chủ đang gặp sự cố. Vui lòng thử lại sau.";
+  return "Yêu cầu chưa hợp lệ. Vui lòng kiểm tra lại thông tin và thử lại.";
 }
 
 export async function register(body: { name: string; email: string; password: string }): Promise<AuthResponse> {

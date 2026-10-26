@@ -334,7 +334,7 @@ function AccountPage({ user, onLogout }: { user: User; onLogout: () => void }) {
 
   useEffect(() => {
     if (user.role !== "admin") return;
-    fetchUsers().then(setUsers).catch((e) => setAdminError(e instanceof Error ? e.message : "Không tải được users"));
+    fetchUsers().then(setUsers).catch((e) => setAdminError(errorText(e, "Không tải được danh sách người dùng.")));
   }, [user.role]);
 
   return (
@@ -380,6 +380,13 @@ function AccountPage({ user, onLogout }: { user: User; onLogout: () => void }) {
 }
 
 
+function errorText(error: unknown, fallback: string): string {
+  if (error instanceof Error && /failed to fetch|networkerror|fetch failed/i.test(error.message)) {
+    return "Không thể kết nối tới máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.";
+  }
+  return error instanceof Error ? error.message : fallback;
+}
+
 function AuthPage({ onAuthenticated }: { onAuthenticated: (user: User) => void }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
@@ -407,6 +414,26 @@ function AuthPage({ onAuthenticated }: { onAuthenticated: (user: User) => void }
       setError("Vui lòng nhập họ tên.");
       return;
     }
+    if (!email.trim()) {
+      setError("Vui lòng nhập email.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Vui lòng nhập địa chỉ email hợp lệ.");
+      return;
+    }
+    if (!password) {
+      setError("Vui lòng nhập mật khẩu.");
+      return;
+    }
+    if (mode === "register" && password.length < 6) {
+      setError("Mật khẩu cần có ít nhất 6 ký tự.");
+      return;
+    }
+    if (password.length > 128) {
+      setError("Mật khẩu không được vượt quá 128 ký tự.");
+      return;
+    }
     setLoading(true);
     try {
       const result = mode === "login"
@@ -414,7 +441,7 @@ function AuthPage({ onAuthenticated }: { onAuthenticated: (user: User) => void }
         : await registerApi({ name: name.trim(), email: email.trim(), password });
       onAuthenticated(result.user);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không thể xác thực");
+      setError(errorText(e, "Không thể xác thực."));
     } finally {
       setLoading(false);
     }
@@ -438,7 +465,7 @@ function AuthPage({ onAuthenticated }: { onAuthenticated: (user: User) => void }
           const result = await googleLogin(response.credential);
           onAuthenticated(result.user);
         } catch (e) {
-          setError(e instanceof Error ? e.message : "Đăng nhập Google thất bại");
+          setError(errorText(e, "Đăng nhập Google thất bại."));
         }
       },
     });
@@ -581,7 +608,7 @@ export default function App() {
       const nextReport = await fetchReport(item.id);
       setSelectedReport(nextReport);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Báo cáo chưa sẵn sàng");
+      setError(errorText(e, "Báo cáo chưa sẵn sàng."));
     }
   };
 
@@ -605,7 +632,7 @@ export default function App() {
       await loadAndAsk(s.id, 0);
       refreshDashboard();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không tạo được phiên");
+      setError(errorText(e, "Không tạo được phiên."));
     } finally {
       setLoading(false);
     }
@@ -669,7 +696,7 @@ export default function App() {
         await loadAndAsk(session.id, next);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Lỗi đánh giá");
+      setError(errorText(e, "Lỗi đánh giá."));
       setPhase("REVIEW_TRANSCRIPT");
     } finally {
       setLoading(false);

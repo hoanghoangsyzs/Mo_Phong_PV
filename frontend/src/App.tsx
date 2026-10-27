@@ -414,26 +414,15 @@ function AuthPage({ onAuthenticated }: { onAuthenticated: (user: User) => void }
       setError("Vui lòng nhập họ tên.");
       return;
     }
-    if (!email.trim()) {
-      setError("Vui lòng nhập email.");
-      return;
-    }
+    if (!email.trim()) { setError("Vui lòng nhập email."); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError("Vui lòng nhập địa chỉ email hợp lệ.");
-      return;
+      setError("Vui lòng nhập địa chỉ email hợp lệ."); return;
     }
-    if (!password) {
-      setError("Vui lòng nhập mật khẩu.");
-      return;
-    }
+    if (!password) { setError("Vui lòng nhập mật khẩu."); return; }
     if (mode === "register" && password.length < 6) {
-      setError("Mật khẩu cần có ít nhất 6 ký tự.");
-      return;
+      setError("Mật khẩu cần có ít nhất 6 ký tự."); return;
     }
-    if (password.length > 128) {
-      setError("Mật khẩu không được vượt quá 128 ký tự.");
-      return;
-    }
+    if (password.length > 128) { setError("Mật khẩu không được vượt quá 128 ký tự."); return; }
     setLoading(true);
     try {
       const result = mode === "login"

@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import secrets
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -134,18 +135,27 @@ def _generate_json(prompt: str, temperature: float = 0.35) -> dict[str, Any]:
         },
     }
     data = json.dumps(body, ensure_ascii=False).encode("utf-8")
-    request = urllib.request.Request(
-        url,
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-goog-api-key": GEMINI_API_KEY,
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=GEMINI_TIMEOUT_SECONDS) as response:
-        raw = response.read().decode("utf-8")
-    return _json_from_text(_extract_text(json.loads(raw)))
+    for attempt in range(3):
+        request = urllib.request.Request(
+            url,
+            data=data,
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": GEMINI_API_KEY,
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=GEMINI_TIMEOUT_SECONDS) as response:
+                raw = response.read().decode("utf-8")
+            return _json_from_text(_extract_text(json.loads(raw)))
+        except urllib.error.HTTPError as exc:
+            if exc.code != 503 or attempt == 2:
+                raise
+            delay = 2 ** attempt
+            logger.warning("Gemini returned HTTP 503; retrying in %s second(s)", delay)
+            time.sleep(delay)
+    raise RuntimeError("Gemini request failed after retries")
 
 
 def evaluate_answer_with_gemini(

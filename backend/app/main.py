@@ -293,7 +293,7 @@ def create_session(body: SessionCreate, user: User = Depends(current_user), db: 
     except GeminiQuestionGenerationError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Gemini không tạo được câu hỏi. Vui lòng kiểm tra GEMINI_API_KEY và GEMINI_MODEL trên Render.",
+            detail="Gemini API đang tạm thời không khả dụng hoặc phản hồi quá chậm. Vui lòng thử lại sau; nếu vẫn lỗi, kiểm tra Render Logs.",
         ) from exc
     question_source = "gemini" if questions else "question_bank"
     if questions is None:

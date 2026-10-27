@@ -88,7 +88,7 @@ function formatApiError(body: string, status: number): string {
       "Missing token": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
       "Invalid token": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
       "Invalid export format": "Định dạng xuất báo cáo không hợp lệ.",
-      "Gemini không tạo được câu hỏi. Vui lòng kiểm tra GEMINI_API_KEY và GEMINI_MODEL trên Render.": "Gemini không tạo được câu hỏi. Kiểm tra API key/model trên Render rồi thử lại.",
+      "Gemini API đang tạm thời không khả dụng hoặc phản hồi quá chậm. Vui lòng thử lại sau; nếu vẫn lỗi, kiểm tra Render Logs.": "Gemini hiện không phản hồi được. Hãy thử lại sau; nếu lỗi tiếp diễn, kiểm tra Render Logs.",
     };
     if (known[detail]) return known[detail];
   }

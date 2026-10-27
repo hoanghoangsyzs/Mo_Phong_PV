@@ -10,8 +10,8 @@ from typing import Any
 
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
-GEMINI_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "12"))
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+GEMINI_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "45"))
 logger = logging.getLogger(__name__)
 
 
@@ -122,6 +122,12 @@ def _json_from_text(text: str) -> dict[str, Any]:
 
 def _generate_json(prompt: str, temperature: float = 0.35) -> dict[str, Any]:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+    generation_config: dict[str, Any] = {
+        "responseMimeType": "application/json",
+        "maxOutputTokens": 2048,
+    }
+    if GEMINI_MODEL not in {"gemini-3.6-flash", "gemini-3.5-flash-lite"}:
+        generation_config["temperature"] = temperature
     body = {
         "contents": [
             {
@@ -129,10 +135,7 @@ def _generate_json(prompt: str, temperature: float = 0.35) -> dict[str, Any]:
                 "parts": [{"text": prompt}],
             }
         ],
-        "generationConfig": {
-            "temperature": temperature,
-            "responseMimeType": "application/json",
-        },
+        "generationConfig": generation_config,
     }
     data = json.dumps(body, ensure_ascii=False).encode("utf-8")
     timeout_retried = False

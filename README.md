@@ -96,8 +96,8 @@ Backend vẫn chấm điểm bằng thuật toán rule-based để hệ thống 
 
 ```env
 GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-3.5-flash
-GEMINI_TIMEOUT_SECONDS=12
+GEMINI_MODEL=gemini-3.5-flash-lite
+GEMINI_TIMEOUT_SECONDS=45
 ```
 
 3. Khởi động lại backend.

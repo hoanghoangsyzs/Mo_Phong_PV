@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { synthesizeSpeech } from "../api/client";
 
 function chooseVietnameseVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
   const vietnamese = voices.filter((voice) => voice.lang.toLowerCase().startsWith("vi"));
@@ -22,47 +23,85 @@ export function useSpeech() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const recordStartRef = useRef<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+  const speakRequestRef = useRef(0);
 
   useEffect(() => {
-    setTtsSupported(typeof window !== "undefined" && "speechSynthesis" in window);
+    setTtsSupported(true);
     setSttSupported(!!getRecognitionCtor());
   }, []);
 
   const speak = useCallback(
-    (text: string, lang = "vi-VN"): Promise<void> => {
-      return new Promise((resolve, reject) => {
-        if (!ttsSupported) {
-          reject(new Error("TTS không được hỗ trợ"));
-          return;
-        }
-        window.speechSynthesis.cancel();
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = lang;
-        utter.rate = 0.92;
-        utter.pitch = 1.12;
-        const voices = window.speechSynthesis.getVoices();
-        const vi = chooseVietnameseVoice(voices);
-        if (vi) utter.voice = vi;
-        utter.onstart = () => setIsSpeaking(true);
-        utter.onend = () => {
+    async (text: string, lang = "vi-VN"): Promise<void> => {
+      const requestId = ++speakRequestRef.current;
+      window.speechSynthesis?.cancel();
+      audioRef.current?.pause();
+      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+      audioRef.current = null;
+      audioUrlRef.current = null;
+      setIsSpeaking(false);
+
+      try {
+        const audioBlob = await synthesizeSpeech(text);
+        if (requestId !== speakRequestRef.current) return;
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        audioRef.current = audio;
+        audioUrlRef.current = audioUrl;
+        audio.onended = () => {
+          if (requestId !== speakRequestRef.current) return;
           setIsSpeaking(false);
-          resolve();
+          URL.revokeObjectURL(audioUrl);
+          audioUrlRef.current = null;
+          audioRef.current = null;
         };
-        utter.onerror = () => {
-          setIsSpeaking(false);
-          resolve();
+        audio.onerror = () => {
+          if (requestId === speakRequestRef.current) setIsSpeaking(false);
         };
-        window.speechSynthesis.speak(utter);
-      });
+        setIsSpeaking(true);
+        await audio.play();
+        return await new Promise<void>((resolve) => {
+          audio.onended = () => {
+            if (requestId === speakRequestRef.current) setIsSpeaking(false);
+            URL.revokeObjectURL(audioUrl);
+            if (audioUrlRef.current === audioUrl) audioUrlRef.current = null;
+            if (audioRef.current === audio) audioRef.current = null;
+            resolve();
+          };
+          audio.onerror = () => {
+            if (requestId === speakRequestRef.current) setIsSpeaking(false);
+            resolve();
+          };
+        });
+      } catch {
+        if (requestId !== speakRequestRef.current) return;
+        if (!("speechSynthesis" in window)) throw new Error("Không thể phát giọng đọc trên trình duyệt này.");
+        await new Promise<void>((resolve) => {
+          const utter = new SpeechSynthesisUtterance(text);
+          utter.lang = lang;
+          utter.rate = 0.92;
+          const vi = chooseVietnameseVoice(window.speechSynthesis.getVoices());
+          if (vi) utter.voice = vi;
+          utter.onstart = () => setIsSpeaking(true);
+          utter.onend = () => { setIsSpeaking(false); resolve(); };
+          utter.onerror = () => { setIsSpeaking(false); resolve(); };
+          window.speechSynthesis.speak(utter);
+        });
+      }
     },
-    [ttsSupported]
+    []
   );
 
   const stopSpeaking = useCallback(() => {
-    window.speechSynthesis.cancel();
+    speakRequestRef.current += 1;
+    window.speechSynthesis?.cancel();
+    audioRef.current?.pause();
+    audioRef.current = null;
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    audioUrlRef.current = null;
     setIsSpeaking(false);
   }, []);
-
   const startListening = useCallback(
     (
       onResult: (transcript: string) => void,
@@ -151,4 +190,6 @@ export function useSpeech() {
     getRecordingDurationSec,
   };
 }
+
+
 

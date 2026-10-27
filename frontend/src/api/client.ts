@@ -21,6 +21,15 @@ export function setToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
+export async function synthesizeSpeech(text: string): Promise<Blob> {
+  const response = await fetch(`${BASE}/tts`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ text }),
+  });
+  if (!response.ok) throw new Error("Speech synthesis unavailable");
+  return response.blob();
+}
 function authHeaders(extra?: HeadersInit): HeadersInit {
   const token = getToken();
   return {
@@ -211,4 +220,5 @@ export function exportUrl(sessionId: number, format: "json" | "csv" | "html"): s
   const token = getToken();
   return `${BASE}/sessions/${sessionId}/export?format=${format}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
 }
+
 

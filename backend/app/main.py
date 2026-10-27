@@ -2,10 +2,13 @@ import csv
 import io
 import json
 import os
+import urllib.error
+import urllib.request
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from pydantic import BaseModel, Field
 from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import Session
 
@@ -76,6 +79,41 @@ def ensure_schema():
 ensure_schema()
 
 app = FastAPI(title="He Thong Mo Phong Phong Van", version="1.0.0")
+class SpeechRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+@app.post("/api/tts")
+def synthesize_speech(body: SpeechRequest, _user: User = Depends(current_user)):
+    """Proxy speech synthesis through the backend so the provider key stays private."""
+    api_key = os.getenv("ELEVENLABS_API_KEY", "").strip()
+    voice_id = os.getenv("ELEVENLABS_VOICE_ID", "").strip()
+    if not api_key or not voice_id:
+        raise HTTPException(status_code=503, detail="ElevenLabs TTS is not configured")
+
+    payload = json.dumps({
+        "text": body.text,
+        "model_id": os.getenv("ELEVENLABS_MODEL_ID", "eleven_flash_v2_5"),
+        "language_code": "vi",
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=mp3_44100_128",
+        data=payload,
+        headers={"xi-api-key": api_key, "Content-Type": "application/json", "Accept": "audio/mpeg"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as upstream:
+            audio = upstream.read()
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            raise HTTPException(status_code=502, detail="ElevenLabs rejected the API key") from exc
+        if exc.code == 429:
+            raise HTTPException(status_code=429, detail="ElevenLabs usage limit reached") from exc
+        raise HTTPException(status_code=502, detail="ElevenLabs speech synthesis failed") from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise HTTPException(status_code=502, detail="Could not reach ElevenLabs") from exc
+    return Response(content=audio, media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
 
 
 def configured_cors_origins() -> list[str]:
@@ -458,6 +496,8 @@ def _render_html_report(report: dict, session_id: int) -> str:
     <h2>Chi tiết từng câu</h2><table><tr>
     <th>STT</th><th>Nhóm</th><th>Câu hỏi</th><th>Tóm tắt</th>
     <th>Nội dung</th><th>Từ khóa</th><th>Cấu trúc</th><th>STAR</th><th>Điểm</th><th>Nhận xét</th></tr>{rows}</table></body></html>"""
+
+
 
 
 

@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+function chooseVietnameseVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+  const vietnamese = voices.filter((voice) => voice.lang.toLowerCase().startsWith("vi"));
+  const femaleName = /female|woman|hoai\s?my|mai|linh|thuy|ngoc/i;
+  return vietnamese.find((voice) => femaleName.test(voice.name))
+    // Prefer a recognizable Vietnamese feminine voice when the browser has no gender metadata.
+    ?? vietnamese.find((voice) => /google/i.test(voice.name))
+    ?? vietnamese[0];
+}
 function getRecognitionCtor(): (new () => SpeechRecognition) | null {
   const w = window as Window & {
     SpeechRecognition?: new () => SpeechRecognition;
@@ -30,9 +38,10 @@ export function useSpeech() {
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text);
         utter.lang = lang;
-        utter.rate = 1;
+        utter.rate = 0.92;
+        utter.pitch = 1.12;
         const voices = window.speechSynthesis.getVoices();
-        const vi = voices.find((v) => v.lang.startsWith("vi"));
+        const vi = chooseVietnameseVoice(voices);
         if (vi) utter.voice = vi;
         utter.onstart = () => setIsSpeaking(true);
         utter.onend = () => {

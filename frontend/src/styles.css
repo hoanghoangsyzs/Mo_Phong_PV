@@ -251,6 +251,11 @@ textarea {
   inset: 32px 0 auto;
 }
 
+.call-card .avatar__portrait {
+  width: 130px;
+  height: 130px;
+}
+
 .call-card--camera {
   display: grid;
   place-items: center;
@@ -580,6 +585,31 @@ textarea:focus {
 
 .avatar {
   text-align: center;
+}
+.avatar__portrait {
+  display: block;
+  width: 136px;
+  height: 136px;
+  margin: 0 auto;
+  border: 5px solid #2b3563;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.avatar--speaking .avatar__portrait {
+  border-color: #8868ff;
+  box-shadow: 0 0 0 6px rgba(124, 77, 255, 0.14), 0 12px 30px rgba(0, 0, 0, 0.28);
+}
+
+.avatar--listening .avatar__portrait {
+  border-color: #2bd989;
+  box-shadow: 0 0 0 6px rgba(39, 209, 127, 0.14), 0 12px 30px rgba(0, 0, 0, 0.28);
+}
+
+.avatar--thinking .avatar__portrait {
+  border-color: #f4c95d;
 }
 
 .avatar__face {

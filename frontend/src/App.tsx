@@ -106,6 +106,12 @@ function formatDate(value: string | null | undefined) {
   return new Date(value).toLocaleString("vi-VN");
 }
 
+function formatElapsed(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
+}
+
 function scoreText(value: number | null | undefined) {
   return value == null ? "--" : `${Math.round(value)}/100`;
 }
@@ -414,15 +420,26 @@ function AuthPage({ onAuthenticated }: { onAuthenticated: (user: User) => void }
       setError("Vui lòng nhập họ tên.");
       return;
     }
-    if (!email.trim()) { setError("Vui lòng nhập email."); return; }
+    if (!email.trim()) {
+      setError("Vui lòng nhập email.");
+      return;
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError("Vui lòng nhập địa chỉ email hợp lệ."); return;
+      setError("Vui lòng nhập địa chỉ email hợp lệ.");
+      return;
     }
-    if (!password) { setError("Vui lòng nhập mật khẩu."); return; }
+    if (!password) {
+      setError("Vui lòng nhập mật khẩu.");
+      return;
+    }
     if (mode === "register" && password.length < 6) {
-      setError("Mật khẩu cần có ít nhất 6 ký tự."); return;
+      setError("Mật khẩu cần có ít nhất 6 ký tự.");
+      return;
     }
-    if (password.length > 128) { setError("Mật khẩu không được vượt quá 128 ký tự."); return; }
+    if (password.length > 128) {
+      setError("Mật khẩu không được vượt quá 128 ký tự.");
+      return;
+    }
     setLoading(true);
     try {
       const result = mode === "login"
@@ -515,6 +532,7 @@ export default function App() {
   const [report, setReport] = useState<FinalReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const refreshDashboard = useCallback(async () => {
     const [nextStats, nextSessions, nextBank] = await Promise.allSettled([
@@ -545,6 +563,17 @@ export default function App() {
   useEffect(() => {
     if (!speech.sttSupported) setUseFallback(true);
   }, [speech.sttSupported]);
+
+  useEffect(() => {
+    if (!session || phase === "FINAL_REPORT") return;
+    const updateClock = () => {
+      const startedAt = Date.parse(session.started_at);
+      setElapsedSeconds(Number.isFinite(startedAt) ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0);
+    };
+    updateClock();
+    const timer = window.setInterval(updateClock, 1000);
+    return () => window.clearInterval(timer);
+  }, [session?.id, session?.started_at, phase === "FINAL_REPORT"]);
 
   const handleAuthenticated = (nextUser: User) => {
     setError(null);
@@ -687,11 +716,9 @@ export default function App() {
         setPhase("FINAL_REPORT");
         refreshDashboard();
         const overview = fin.report.overview;
-        const scoreValue = typeof overview?.total_score === "number"
-          ? (Number.isInteger(overview.total_score) ? String(overview.total_score) : overview.total_score.toFixed(1))
+        const score = typeof overview?.total_score === "number"
+          ? `Bạn đạt ${Number.isInteger(overview.total_score) ? overview.total_score : overview.total_score.toFixed(1)} điểm${overview.grade_label ? `, xếp loại ${overview.grade_label}` : ""}.`
           : "";
-        const gradeText = overview?.grade_label ? `, xếp loại ${overview.grade_label}` : "";
-        const score = scoreValue ? `Bạn đạt ${scoreValue} điểm${gradeText}.` : "";
         const reportClosing = fin.closing_remarks?.trim() ?? "";
         const thanks = /cảm ơn/i.test(reportClosing)
           ? ""
@@ -744,11 +771,27 @@ export default function App() {
 
       {session && (
         <>
-          <div className="session-header"><div><p className="eyebrow">Mock Interview</p><h2>{session.position}</h2><p>{session.candidate_name} · {session.level}</p></div><StatusBadge phase={phase} /></div>
-          {phase !== "FINAL_REPORT" && <><div className="video-grid"><section className="call-card"><span className="pill pill--blue">AI HOST</span><Avatar mode={avatarMode()} /><div className="participant-label"><strong>AI Interviewer</strong><small>{phase === "AI_ASKING" ? "Speaking" : "Technical interviewer"}</small></div></section><UserCamera statusLabel={phase === "RECORDING" ? "Recording answer" : "Candidate"} recordingActive={phase === "RECORDING"} canRecord={phase === "WAITING_ANSWER" || phase === "RECORDING"} onToggleRecording={phase === "RECORDING" ? stopRecording : startAnswer} /></div><p className="privacy-note">Micro/STT hoạt động tốt nhất trên Chrome hoặc Edge khi dùng HTTPS hoặc localhost.</p></>}
+          <div className="interview-toolbar">
+            <div className="interview-toolbar__identity">
+              <p className="eyebrow">BUỔI PHỎNG VẤN</p>
+              <h2>{session.position}</h2>
+              <p>{session.candidate_name} <span aria-hidden>·</span> {session.level}</p>
+              <span className="interview-source-chip">{session.question_source === "gemini" ? "Câu hỏi cá nhân hóa bởi Gemini" : "Bộ câu hỏi phỏng vấn mẫu"}</span>
+            </div>
+            <div className="interview-toolbar__actions">
+              <span className="interview-clock"><i aria-hidden />{formatElapsed(elapsedSeconds)}</span>
+              <span className="interview-progress-label">{question ? `Câu ${questionIndex + 1} / ${question.total}` : `Chuẩn bị ${session.total_questions} câu hỏi`}</span>
+              <StatusBadge phase={phase} />
+            </div>
+            <div className="interview-progress-track" aria-label={question ? `Tiến độ câu ${questionIndex + 1} trên ${question.total}` : "Chưa bắt đầu câu hỏi"}>
+              <span style={{ width: question ? `${((questionIndex + 1) / question.total) * 100}%` : "0%" }} />
+            </div>
+          </div>
+          {phase !== "FINAL_REPORT" && <><div className="video-grid"><section className="call-card"><span className="pill pill--blue">AI HOST</span><Avatar mode={avatarMode()} /><div className="participant-label"><strong>AI Interviewer</strong><small>{phase === "AI_ASKING" ? "Đang đặt câu hỏi" : phase === "RECORDING" ? "Đang lắng nghe" : "Người phỏng vấn AI"}</small></div></section><UserCamera statusLabel="Ứng viên" recordingActive={phase === "RECORDING"} canRecord={phase === "WAITING_ANSWER" || phase === "RECORDING"} onToggleRecording={phase === "RECORDING" ? stopRecording : startAnswer} /></div><p className="privacy-note">Micro chỉ dùng để nhận diện câu trả lời; camera không bắt buộc.</p></>}
           <div className="interview-main">
-            {phase !== "FINAL_REPORT" && question && <><p className="meta">Câu {questionIndex + 1}/{question.total} · {question.group}</p><div className="question-stage"><div className="panel-heading"><span className="pill pill--blue">Interviewer</span><div className="panel-actions" aria-hidden><span /><span /></div></div><h2>{question.text}</h2></div></>}
-            {phase === "RECORDING" && <div className="card transcript-card"><h3>Đang chuyển giọng nói thành text</h3><p className="transcript transcript--live">{transcript || "Hãy bắt đầu nói, nội dung sẽ xuất hiện tại đây..."}</p></div>}
+            {phase !== "FINAL_REPORT" && question && <><div className="question-meta"><p className="meta">CÂU {questionIndex + 1} / {question.total}</p><span>{question.group}</span></div><section className="question-stage question-stage--live"><div className="panel-heading"><span className="pill pill--blue">AI INTERVIEWER</span><button type="button" className="question-replay" onClick={replayQuestion} disabled={phase === "EVALUATING"} aria-label="Nghe lại câu hỏi">↻ <span>Nghe lại</span></button></div><h2>{question.text}</h2><p className="question-hint">Bạn có thể chia sẻ cách suy nghĩ, kinh nghiệm và mong muốn của mình. Không cần trả lời theo khuôn mẫu.</p></section></>}
+            {phase === "WAITING_ANSWER" && <div className="answer-prompt"><span className="answer-prompt__dot" /><div><strong>Đến lượt bạn</strong><p>Nhấn nút micro để trả lời bằng giọng nói, hoặc chọn nhập câu trả lời.</p></div></div>}
+            {phase === "RECORDING" && <div className="card transcript-card"><div className="answer-live-heading"><h3>Đang lắng nghe câu trả lời</h3><span className="recording-indicator">ĐANG GHI ÂM</span></div><p className="transcript transcript--live">{transcript || "Hãy bắt đầu nói, nội dung sẽ xuất hiện tại đây..."}</p></div>
             {phase === "REVIEW_TRANSCRIPT" && <div className="card transcript-card"><h3>Transcript — kiểm tra trước khi gửi</h3>{useFallback ? <textarea rows={5} value={fallbackText} onChange={(e) => setFallbackText(e.target.value)} placeholder="Nhập câu trả lời nếu micro/STT không hoạt động" /> : <p className="transcript">{transcript || "(Chưa có nội dung — hãy ghi âm lại)"}</p>}<label className="checkbox"><input type="checkbox" checked={useFallback} onChange={(e) => setUseFallback(e.target.checked)} />Dùng nhập text (fallback)</label></div>}
             {lastFeedback && phase !== "FINAL_REPORT" && phase !== "AI_ASKING" && <p className="feedback-hint"><small>Nhận xét vừa rồi: {lastFeedback}</small></p>}
             {error && <p className="error">{error}</p>}

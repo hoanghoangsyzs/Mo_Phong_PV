@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import urllib.error
 import urllib.request
@@ -7,8 +8,9 @@ from typing import Any
 
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash").strip()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
 GEMINI_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "12"))
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -21,6 +23,59 @@ class GeminiEvaluation:
 
 def gemini_enabled() -> bool:
     return bool(GEMINI_API_KEY and GEMINI_MODEL)
+
+
+def generate_interview_questions_with_gemini(position: str, level: str, count: int = 5) -> list[dict[str, Any]] | None:
+    if not gemini_enabled():
+        return None
+
+    prompt = f"""
+Bạn là chuyên gia thiết kế phỏng vấn tuyển dụng. Hãy tạo đúng {count} câu hỏi phỏng vấn kỹ thuật
+bằng tiếng Việt cho vị trí "{position}" ở trình độ "{level}".
+Hãy tạo một cuộc phỏng vấn thực thụ, không phải bài kiểm tra định nghĩa. Cân bằng các mảng: động lực ứng tuyển;
+những trách nhiệm, môi trường hoặc cơ hội phát triển mà ứng viên mong muốn; tình huống công việc thực tế phù hợp
+với vị trí; kỹ năng chuyên môn được áp dụng vào công việc; phối hợp nhóm, ưu tiên và xử lý vấn đề.
+Ít nhất một câu hỏi phải tìm hiểu lý do ứng viên quan tâm đến vị trí và kỳ vọng trong công việc tiếp theo.
+Ít nhất hai câu hỏi phải đưa ra bối cảnh hoặc ràng buộc thực tế và hỏi ứng viên sẽ tiếp cận ra sao.
+Điều chỉnh độ sâu kỹ thuật theo level. Không bịa yêu cầu của một công ty cụ thể, không hỏi thông tin nhạy cảm
+như tuổi, tình trạng hôn nhân hoặc sức khỏe. Câu hỏi rõ ràng, tự nhiên, không trùng ý.
+Trả về JSON object duy nhất theo schema:
+{{"questions":[{{"group":"nhóm câu hỏi ngắn","text":"nội dung câu hỏi","keywords":["từ khóa chuyên môn kỳ vọng"]}}]}}
+Mỗi câu hỏi cần có 4-7 từ khóa ngắn để chấm câu trả lời. Chỉ trả đúng {count} câu hỏi; không thêm đáp án.
+""".strip()
+
+    try:
+        data = _generate_json(prompt)
+    except Exception as exc:
+        logger.warning("Gemini question generation failed; using question bank (%s)", type(exc).__name__)
+        return None
+
+    raw_questions = data.get("questions")
+    if not isinstance(raw_questions, list):
+        logger.warning("Gemini question generation returned an invalid response; using question bank")
+        return None
+
+    questions: list[dict[str, Any]] = []
+    for item in raw_questions:
+        if not isinstance(item, dict):
+            continue
+        group = item.get("group")
+        text = item.get("text")
+        keywords = item.get("keywords")
+        if not isinstance(group, str) or not isinstance(text, str) or not isinstance(keywords, list):
+            continue
+        clean_group = group.strip()[:128]
+        clean_text = text.strip()[:2000]
+        clean_keywords = list(dict.fromkeys(
+            value.strip()[:80] for value in keywords if isinstance(value, str) and value.strip()
+        ))[:10]
+        if clean_group and clean_text and clean_keywords:
+            questions.append({"group": clean_group, "text": clean_text, "keywords": clean_keywords})
+
+    if len(questions) != count:
+        logger.warning("Gemini generated %s valid questions; expected %s. Using question bank", len(questions), count)
+        return None
+    return questions
 
 
 def _extract_text(payload: dict[str, Any]) -> str:
@@ -121,7 +176,8 @@ Không bịa kinh nghiệm ngoài transcript. Không dùng markdown.
 
     try:
         data = _generate_json(prompt)
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+    except Exception as exc:
+        logger.warning("Gemini evaluation failed; using rule-based fallback (%s)", type(exc).__name__)
         return None
 
     return GeminiEvaluation(
@@ -176,7 +232,8 @@ Không dùng markdown.
 
     try:
         data = _generate_json(prompt)
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+    except Exception as exc:
+        logger.warning("Gemini report summary failed; keeping rule-based summary (%s)", type(exc).__name__)
         return None
 
     overall_comment = str(data.get("overall_comment") or "").strip()

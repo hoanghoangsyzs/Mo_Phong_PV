@@ -15,6 +15,7 @@ class SessionOut(BaseModel):
     candidate_name: str
     position: str
     level: str
+    question_source: str = "question_bank"
     started_at: datetime
     ended_at: datetime | None
     total_questions: int

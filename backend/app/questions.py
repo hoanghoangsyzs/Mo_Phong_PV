@@ -3,6 +3,18 @@
 QUESTION_BANK: dict[str, list[dict]] = {
     "Backend Developer": [
         {
+            "group": "Động lực & kỳ vọng công việc",
+            "text": "Điều gì khiến bạn quan tâm đến vị trí Backend Developer? Trong công việc tiếp theo, bạn mong muốn đảm nhận trách nhiệm nào và điều gì sẽ giúp bạn phát triển tốt nhất?",
+            "keywords": ["động lực", "mong muốn", "kỳ vọng", "trách nhiệm", "phát triển", "môi trường"],
+            "difficulty": "Cơ bản",
+            "answer_tips": [
+                "Nêu lý do cụ thể khiến bạn quan tâm đến vai trò này.",
+                "Chia sẻ loại trách nhiệm hoặc bài toán bạn muốn đảm nhận.",
+                "Nêu kỳ vọng về cách làm việc và mục tiêu phát triển, tránh trả lời chung chung."
+            ],
+            "sample_answer": "Tôi quan tâm đến vị trí này vì muốn áp dụng kinh nghiệm hiện có vào những sản phẩm có người dùng thực tế. Ở công việc tiếp theo, tôi mong được tham gia từ lúc làm rõ yêu cầu đến khi theo dõi chất lượng sau triển khai, đồng thời phối hợp thường xuyên với các thành viên khác. Tôi phát triển tốt trong môi trường có mục tiêu rõ ràng, phản hồi thẳng thắn và cơ hội nhận trách nhiệm tăng dần. Tôi cũng muốn hiểu thêm ưu tiên quan trọng nhất của đội trong vài tháng đầu."
+        },
+        {
             "group": "Kiến thức chuyên môn",
             "text": "Bạn giải thích REST API là gì và các phương thức HTTP thường dùng?",
             "keywords": ["REST", "resource", "HTTP", "GET", "POST", "PUT", "PATCH", "DELETE", "status code"],
@@ -64,6 +76,18 @@ QUESTION_BANK: dict[str, list[dict]] = {
         },
     ],
     "Frontend Developer": [
+        {
+            "group": "Động lực & kỳ vọng công việc",
+            "text": "Điều gì khiến bạn quan tâm đến vị trí Frontend Developer? Trong công việc tiếp theo, bạn mong muốn đảm nhận trách nhiệm nào và điều gì sẽ giúp bạn phát triển tốt nhất?",
+            "keywords": ["động lực", "mong muốn", "kỳ vọng", "trách nhiệm", "phát triển", "môi trường"],
+            "difficulty": "Cơ bản",
+            "answer_tips": [
+                "Nêu lý do cụ thể khiến bạn quan tâm đến vai trò này.",
+                "Chia sẻ loại trách nhiệm hoặc bài toán bạn muốn đảm nhận.",
+                "Nêu kỳ vọng về cách làm việc và mục tiêu phát triển, tránh trả lời chung chung."
+            ],
+            "sample_answer": "Tôi quan tâm đến vị trí này vì muốn áp dụng kinh nghiệm hiện có vào những sản phẩm có người dùng thực tế. Ở công việc tiếp theo, tôi mong được tham gia từ lúc làm rõ yêu cầu đến khi theo dõi chất lượng sau triển khai, đồng thời phối hợp thường xuyên với các thành viên khác. Tôi phát triển tốt trong môi trường có mục tiêu rõ ràng, phản hồi thẳng thắn và cơ hội nhận trách nhiệm tăng dần. Tôi cũng muốn hiểu thêm ưu tiên quan trọng nhất của đội trong vài tháng đầu."
+        },
         {
             "group": "Kiến thức chuyên môn",
             "text": "React state và props khác nhau thế nào? Khi nào dùng useEffect?",

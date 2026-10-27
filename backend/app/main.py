@@ -35,7 +35,7 @@ from app.schemas import (
     UserOut,
 )
 from app.services.evaluation import evaluate_answer
-from app.services.gemini import evaluate_answer_with_gemini, gemini_enabled
+from app.services.gemini import evaluate_answer_with_gemini, generate_interview_questions_with_gemini, gemini_enabled
 from app.services.report import finalize_session
 
 
@@ -44,9 +44,15 @@ def ensure_schema():
     inspector = inspect(engine)
     if "interview_sessions" in inspector.get_table_names():
         columns = {column["name"] for column in inspector.get_columns("interview_sessions")}
-        if "user_id" not in columns:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE interview_sessions ADD COLUMN user_id INTEGER"))
+        additions = {
+            "user_id": "INTEGER",
+            "questions_json": "TEXT",
+            "question_source": "VARCHAR(32) DEFAULT 'question_bank'",
+        }
+        with engine.begin() as conn:
+            for name, ddl in additions.items():
+                if name not in columns:
+                    conn.execute(text(f"ALTER TABLE interview_sessions ADD COLUMN {name} {ddl}"))
 
     if "interview_answers" in inspector.get_table_names():
         columns = {column["name"] for column in inspector.get_columns("interview_answers")}
@@ -92,6 +98,17 @@ def assert_session_access(session: InterviewSession | None, user: User):
         raise HTTPException(404, "Session not found")
     if user.role != "admin" and session.user_id != user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not allowed")
+
+
+def questions_for_session(session: InterviewSession) -> list[dict]:
+    if session.questions_json:
+        try:
+            questions = json.loads(session.questions_json)
+            if isinstance(questions, list) and questions:
+                return questions
+        except (TypeError, json.JSONDecodeError):
+            pass
+    return get_questions_for_position(session.position)
 
 
 @app.get("/api/health")
@@ -228,12 +245,17 @@ def get_statistics(user: User = Depends(current_user), db: Session = Depends(get
 
 @app.post("/api/sessions", response_model=SessionOut)
 def create_session(body: SessionCreate, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    questions = get_questions_for_position(body.position)
+    questions = generate_interview_questions_with_gemini(body.position, body.level)
+    question_source = "gemini" if questions else "question_bank"
+    if questions is None:
+        questions = get_questions_for_position(body.position)
     session = InterviewSession(
         user_id=user.id,
         candidate_name=body.candidate_name,
         position=body.position,
         level=body.level,
+        questions_json=json.dumps(questions, ensure_ascii=False),
+        question_source=question_source,
         total_questions=len(questions),
         status="active",
     )
@@ -254,7 +276,7 @@ def get_session(session_id: int, user: User = Depends(current_user), db: Session
 def get_question(session_id: int, index: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     session = db.get(InterviewSession, session_id)
     assert_session_access(session, user)
-    questions = get_questions_for_position(session.position)
+    questions = questions_for_session(session)
     if index < 0 or index >= len(questions):
         raise HTTPException(404, "Question not found")
     q = questions[index]
@@ -268,7 +290,7 @@ def submit_and_evaluate(session_id: int, body: AnswerSubmit, user: User = Depend
     if session.status != "active":
         raise HTTPException(400, "Session already completed")
 
-    questions = get_questions_for_position(session.position)
+    questions = questions_for_session(session)
     if body.question_index < 0 or body.question_index >= len(questions):
         raise HTTPException(400, "Invalid question index")
 

@@ -93,7 +93,7 @@ export function UserCamera({
     }
   }, [enabled]);
 
-  const micLabel = recordingActive ? "Rec On" : micEnabled ? "Mic On" : "Mic Off";
+  const micLabel = recordingActive ? "Đang ghi âm" : micEnabled ? "Micro bật" : "Bật micro";
   const micTitle = recordingActive
     ? "Dừng ghi âm và kiểm tra transcript"
     : canRecord
@@ -103,7 +103,7 @@ export function UserCamera({
   return (
     <section className={`call-card call-card--camera${enabled ? " call-card--camera-on" : ""}`}>
       <span className={`pill ${enabled ? "pill--green" : "pill--muted"}`}>
-        {enabled ? "LIVE" : "OFF"}
+        {enabled ? "ĐANG BẬT" : "TẮT"}
       </span>
 
       <div className="media-controls">
@@ -114,7 +114,7 @@ export function UserCamera({
           aria-label={enabled ? "Tắt camera" : "Bật camera"}
           title={enabled ? "Tắt camera" : "Bật camera"}
         >
-          {enabled ? "Cam On" : "Cam Off"}
+          {enabled ? "Tắt camera" : "Bật camera"}
         </button>
         <button
           type="button"
@@ -132,13 +132,13 @@ export function UserCamera({
       ) : (
         <div className="camera-placeholder">
           <span className="camera-icon" aria-hidden>□</span>
-          <p>{error ?? "Camera is off"}</p>
+          <p>{error ?? "Camera đang tắt"}</p>
           {micError && <small>{micError}</small>}
         </div>
       )}
 
       <div className="participant-label">
-        <strong>You</strong>
+        <strong>Bạn</strong>
         <small>{recordingActive ? "Đang chuyển giọng nói thành text" : enabled ? statusLabel : micEnabled ? "Mic ready" : "Camera off"}</small>
       </div>
     </section>

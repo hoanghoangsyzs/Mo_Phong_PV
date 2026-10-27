@@ -31,6 +31,8 @@ class InterviewSession(Base):
     candidate_name: Mapped[str] = mapped_column(String(255))
     position: Mapped[str] = mapped_column(String(255))
     level: Mapped[str] = mapped_column(String(64))
+    questions_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    question_source: Mapped[str] = mapped_column(String(32), default="question_bank")
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     total_questions: Mapped[int] = mapped_column(Integer, default=0)

@@ -14,6 +14,7 @@ export interface Session {
   candidate_name: string;
   position: string;
   level: string;
+  question_source?: "gemini" | "question_bank";
   started_at: string;
   ended_at: string | null;
   total_questions: number;

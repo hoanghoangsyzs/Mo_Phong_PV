@@ -619,7 +619,11 @@ export default function App() {
       const s = await createSession({ candidate_name: name.trim(), position, level });
       setSession(s);
       setReport(null);
+      setLastFeedback("");
       setActivePage("Mock Interview");
+      setPhase("AI_ASKING");
+      const welcome = `Xin chào ${s.candidate_name}, chào mừng bạn đến với buổi phỏng vấn thử vị trí ${s.position} hôm nay. Tôi là AI Interviewer và sẽ đồng hành cùng bạn trong buổi phỏng vấn này. Tôi sẽ lần lượt đặt ${s.total_questions} câu hỏi để tìm hiểu kiến thức và cách bạn giải quyết vấn đề. Bạn cứ thoải mái chia sẻ theo suy nghĩ của mình nhé. Nếu đã sẵn sàng, chúng ta cùng bắt đầu nào!`;
+      try { await speech.speak(welcome); } catch { /* continue with the written interview if TTS is unavailable */ }
       await loadAndAsk(s.id, 0);
       refreshDashboard();
     } catch (e) {
@@ -682,7 +686,18 @@ export default function App() {
         setReport(fin.report);
         setPhase("FINAL_REPORT");
         refreshDashboard();
-        try { await speech.speak(fin.closing_remarks); } catch { /* ignore */ }
+        const overview = fin.report.overview;
+        const scoreValue = typeof overview?.total_score === "number"
+          ? (Number.isInteger(overview.total_score) ? String(overview.total_score) : overview.total_score.toFixed(1))
+          : "";
+        const gradeText = overview?.grade_label ? `, xếp loại ${overview.grade_label}` : "";
+        const score = scoreValue ? `Bạn đạt ${scoreValue} điểm${gradeText}.` : "";
+        const reportClosing = fin.closing_remarks?.trim() ?? "";
+        const thanks = /cảm ơn/i.test(reportClosing)
+          ? ""
+          : "Cảm ơn bạn đã dành thời gian tham gia và chia sẻ câu trả lời. ";
+        const spokenClosing = `Chúc mừng ${session.candidate_name}, bạn đã hoàn thành buổi phỏng vấn thử cho vị trí ${session.position}. ${score} ${thanks}${reportClosing} Buổi phỏng vấn của chúng ta đến đây là kết thúc. Chúc bạn tự tin và thành công!`;
+        try { await speech.speak(spokenClosing); } catch { /* report remains available on screen */ }
       } else {
         await loadAndAsk(session.id, next);
       }

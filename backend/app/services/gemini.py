@@ -135,6 +135,7 @@ def _generate_json(prompt: str, temperature: float = 0.35) -> dict[str, Any]:
         },
     }
     data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+    timeout_retried = False
     for attempt in range(3):
         request = urllib.request.Request(
             url,
@@ -155,6 +156,12 @@ def _generate_json(prompt: str, temperature: float = 0.35) -> dict[str, Any]:
             delay = 2 ** attempt
             logger.warning("Gemini returned HTTP 503; retrying in %s second(s)", delay)
             time.sleep(delay)
+        except TimeoutError:
+            if timeout_retried or attempt == 2:
+                raise
+            timeout_retried = True
+            logger.warning("Gemini request timed out; retrying once in 2 seconds")
+            time.sleep(2)
     raise RuntimeError("Gemini request failed after retries")
 
 

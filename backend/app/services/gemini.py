@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import secrets
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -11,6 +12,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
 GEMINI_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "12"))
 logger = logging.getLogger(__name__)
+
+
+class GeminiQuestionGenerationError(Exception):
+    pass
 
 
 @dataclass
@@ -29,9 +34,18 @@ def generate_interview_questions_with_gemini(position: str, level: str, count: i
     if not gemini_enabled():
         return None
 
+    interview_angle = secrets.choice([
+        "khai thác cách ưu tiên khi nhiều yêu cầu gấp cùng lúc",
+        "khai thác cách phối hợp với đồng đội và làm rõ yêu cầu",
+        "khai thác cách ứng viên học công nghệ mới trong công việc",
+        "khai thác cách xử lý sự cố khi thời gian và dữ liệu đều hạn chế",
+        "khai thác động lực ứng tuyển và môi trường làm việc mong muốn",
+    ])
+
     prompt = f"""
 Bạn là chuyên gia thiết kế phỏng vấn tuyển dụng. Hãy tạo đúng {count} câu hỏi phỏng vấn kỹ thuật
 bằng tiếng Việt cho vị trí "{position}" ở trình độ "{level}".
+Góc khai thác riêng của lượt phỏng vấn này: {interview_angle}.
 Hãy tạo một cuộc phỏng vấn thực thụ, không phải bài kiểm tra định nghĩa. Cân bằng các mảng: động lực ứng tuyển;
 những trách nhiệm, môi trường hoặc cơ hội phát triển mà ứng viên mong muốn; tình huống công việc thực tế phù hợp
 với vị trí; kỹ năng chuyên môn được áp dụng vào công việc; phối hợp nhóm, ưu tiên và xử lý vấn đề.
@@ -45,15 +59,15 @@ Mỗi câu hỏi cần có 4-7 từ khóa ngắn để chấm câu trả lời. 
 """.strip()
 
     try:
-        data = _generate_json(prompt)
+        data = _generate_json(prompt, temperature=0.8)
     except Exception as exc:
-        logger.warning("Gemini question generation failed; using question bank (%s)", type(exc).__name__)
-        return None
+        logger.exception("Gemini question generation failed")
+        raise GeminiQuestionGenerationError("Gemini API request failed") from exc
 
     raw_questions = data.get("questions")
     if not isinstance(raw_questions, list):
-        logger.warning("Gemini question generation returned an invalid response; using question bank")
-        return None
+        logger.error("Gemini returned an invalid question response")
+        raise GeminiQuestionGenerationError("Gemini returned an invalid response")
 
     questions: list[dict[str, Any]] = []
     for item in raw_questions:
@@ -73,8 +87,8 @@ Mỗi câu hỏi cần có 4-7 từ khóa ngắn để chấm câu trả lời. 
             questions.append({"group": clean_group, "text": clean_text, "keywords": clean_keywords})
 
     if len(questions) != count:
-        logger.warning("Gemini generated %s valid questions; expected %s. Using question bank", len(questions), count)
-        return None
+        logger.error("Gemini generated %s valid questions; expected %s", len(questions), count)
+        raise GeminiQuestionGenerationError("Gemini returned an incomplete question set")
     return questions
 
 
@@ -105,7 +119,7 @@ def _json_from_text(text: str) -> dict[str, Any]:
         return {}
 
 
-def _generate_json(prompt: str) -> dict[str, Any]:
+def _generate_json(prompt: str, temperature: float = 0.35) -> dict[str, Any]:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
     body = {
         "contents": [
@@ -115,7 +129,7 @@ def _generate_json(prompt: str) -> dict[str, Any]:
             }
         ],
         "generationConfig": {
-            "temperature": 0.35,
+            "temperature": temperature,
             "responseMimeType": "application/json",
         },
     }
@@ -244,4 +258,3 @@ Không dùng markdown.
         "overall_comment": overall_comment,
         "closing_remarks": closing_remarks,
     }
-

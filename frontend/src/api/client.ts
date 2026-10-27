@@ -88,6 +88,7 @@ function formatApiError(body: string, status: number): string {
       "Missing token": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
       "Invalid token": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
       "Invalid export format": "Định dạng xuất báo cáo không hợp lệ.",
+      "Gemini không tạo được câu hỏi. Vui lòng kiểm tra GEMINI_API_KEY và GEMINI_MODEL trên Render.": "Gemini không tạo được câu hỏi. Kiểm tra API key/model trên Render rồi thử lại.",
     };
     if (known[detail]) return known[detail];
   }
@@ -220,5 +221,3 @@ export function exportUrl(sessionId: number, format: "json" | "csv" | "html"): s
   const token = getToken();
   return `${BASE}/sessions/${sessionId}/export?format=${format}${token ? `&token=${encodeURIComponent(token)}` : ""}`;
 }
-
-

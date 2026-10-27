@@ -38,7 +38,12 @@ from app.schemas import (
     UserOut,
 )
 from app.services.evaluation import evaluate_answer
-from app.services.gemini import evaluate_answer_with_gemini, generate_interview_questions_with_gemini, gemini_enabled
+from app.services.gemini import (
+    GeminiQuestionGenerationError,
+    evaluate_answer_with_gemini,
+    generate_interview_questions_with_gemini,
+    gemini_enabled,
+)
 from app.services.report import finalize_session
 
 
@@ -283,7 +288,13 @@ def get_statistics(user: User = Depends(current_user), db: Session = Depends(get
 
 @app.post("/api/sessions", response_model=SessionOut)
 def create_session(body: SessionCreate, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    questions = generate_interview_questions_with_gemini(body.position, body.level)
+    try:
+        questions = generate_interview_questions_with_gemini(body.position, body.level)
+    except GeminiQuestionGenerationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Gemini không tạo được câu hỏi. Vui lòng kiểm tra GEMINI_API_KEY và GEMINI_MODEL trên Render.",
+        ) from exc
     question_source = "gemini" if questions else "question_bank"
     if questions is None:
         questions = get_questions_for_position(body.position)
@@ -496,10 +507,3 @@ def _render_html_report(report: dict, session_id: int) -> str:
     <h2>Chi tiết từng câu</h2><table><tr>
     <th>STT</th><th>Nhóm</th><th>Câu hỏi</th><th>Tóm tắt</th>
     <th>Nội dung</th><th>Từ khóa</th><th>Cấu trúc</th><th>STAR</th><th>Điểm</th><th>Nhận xét</th></tr>{rows}</table></body></html>"""
-
-
-
-
-
-
-
